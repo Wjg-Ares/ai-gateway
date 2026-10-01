@@ -1,0 +1,17 @@
+{
+  "listen_addr": "127.0.0.1:19527",
+  "gateway_api_key_env": "AI_GATEWAY_API_KEY",
+  "models": {
+    "deepseek-team": {
+      "provider": "deepseek",
+      "upstream_model": "deepseek-flash"
+    }
+  },
+  "providers": {
+    "deepseek": {
+      "protocol": "anthropic",
+      "base_url": "https://api.deepseek.com/anthropic",
+      "api_key_env": "DEEPSEEK_API_KEY"
+    }
+  }
+}

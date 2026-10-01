@@ -1,0 +1,9 @@
+/ai-gateway
+/bin/
+/dist/
+/.gocache/
+*.log
+.env
+.env.*
+!.env.example
+ai-gateway.env
