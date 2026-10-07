@@ -54,7 +54,7 @@ $env:GOARCH = "amd64" # Set to arm64 for an ARM64 server.
 go build -o .\bin\ai-gateway ./cmd/ai-gateway
 ```
 
-The executable defaults to `127.0.0.1:19527`. `GET /healthz` returns a health response. `POST /v1/messages` and `POST /v1/messages/count_tokens` require the gateway key in `x-api-key` or `Authorization: Bearer ...`. The gateway resolves the public model alias, changes the model to its configured upstream name, then proxies the Anthropic request and response. Streaming bytes are passed through and flushed as they arrive. Anthropic-version and beta headers are forwarded; the provider API key is supplied by the gateway and is not forwarded from the client.
+The executable defaults to `127.0.0.1:19527`. `GET /healthz` returns a health response. `GET /v1/models`, `POST /v1/messages`, and `POST /v1/messages/count_tokens` require the gateway key in `x-api-key` or `Authorization: Bearer ...`. The models endpoint returns the configured public aliases in OpenAI-compatible list format, which lets clients such as CC Switch populate their model picker. The gateway resolves the public model alias, changes the model to its configured upstream name, then proxies the Anthropic request and response. Streaming bytes are passed through and flushed as they arrive. Anthropic-version and beta headers are forwarded; the provider API key is supplied by the gateway and is not forwarded from the client.
 
 Before starting, set the gateway key and provider key in the server environment. For example, with the example config:
 

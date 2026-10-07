@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"sort"
 	"strings"
 	"sync"
 
@@ -24,6 +25,12 @@ func (e *RouteError) Error() string { return e.Message }
 
 type Router interface {
 	Forward(ctx context.Context, publicModel, apiPath string, body []byte, headers http.Header) (*http.Response, error)
+}
+
+// ModelLister exposes the public model aliases configured on the gateway.
+// It is used by clients such as CC Switch to populate their model picker.
+type ModelLister interface {
+	ListModels(context.Context, int64) ([]string, error)
 }
 
 // CredentialResolver supplies a database-managed upstream key for the
@@ -75,6 +82,15 @@ func New(cfg config.Config, adapters ...adapter.Adapter) *ConfigRouter {
 
 func (r *ConfigRouter) SetCredentialResolver(resolver CredentialResolver) {
 	r.credentialResolver = resolver
+}
+
+func (r *ConfigRouter) ListModels(_ context.Context, _ int64) ([]string, error) {
+	models := make([]string, 0, len(r.config.Models))
+	for name := range r.config.Models {
+		models = append(models, name)
+	}
+	sort.Strings(models)
+	return models, nil
 }
 
 func (r *ConfigRouter) Forward(ctx context.Context, publicModel, apiPath string, body []byte, headers http.Header) (*http.Response, error) {

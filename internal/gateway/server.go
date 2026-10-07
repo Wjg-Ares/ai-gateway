@@ -92,6 +92,7 @@ func NewServerWithAuthenticator(address string, authenticator APIKeyAuthenticato
 func NewServerWithAdmin(address string, authenticator APIKeyAuthenticator, requestRouter router.Router, adminHandler http.Handler) *Server {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /healthz", healthHandler)
+	mux.Handle("GET /v1/models", authenticate(authenticator, modelsHandler(requestRouter)))
 	mux.Handle("POST /v1/messages", authenticate(authenticator, http.HandlerFunc(anthropicMessagesHandler(requestRouter))))
 	mux.Handle("POST /v1/messages/count_tokens", authenticate(authenticator, http.HandlerFunc(anthropicMessagesHandler(requestRouter))))
 	if adminHandler != nil {
@@ -113,6 +114,48 @@ func healthHandler(w http.ResponseWriter, _ *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	_, _ = w.Write([]byte(`{"status":"ok"}`))
+}
+
+type modelListResponse struct {
+	Object string            `json:"object"`
+	Data   []modelListRecord `json:"data"`
+}
+
+type modelListRecord struct {
+	ID      string `json:"id"`
+	Object  string `json:"object"`
+	Created int64  `json:"created"`
+	OwnedBy string `json:"owned_by"`
+}
+
+func modelsHandler(requestRouter router.Router) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		lister, ok := requestRouter.(router.ModelLister)
+		if !ok {
+			writeOpenAIError(w, http.StatusNotImplemented, "model listing is not implemented")
+			return
+		}
+		userID, _ := router.RequestUserID(r.Context())
+		models, err := lister.ListModels(r.Context(), userID)
+		if err != nil {
+			writeOpenAIError(w, http.StatusServiceUnavailable, "model listing is unavailable")
+			return
+		}
+		items := make([]modelListRecord, 0, len(models))
+		for _, model := range models {
+			items = append(items, modelListRecord{ID: model, Object: "model", OwnedBy: "ai-gateway"})
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(modelListResponse{Object: "list", Data: items})
+	})
+}
+
+func writeOpenAIError(w http.ResponseWriter, status int, message string) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(status)
+	_ = json.NewEncoder(w).Encode(map[string]any{
+		"error": map[string]string{"message": message, "type": "server_error"},
+	})
 }
 
 func authenticate(authenticator APIKeyAuthenticator, next http.Handler) http.Handler {
