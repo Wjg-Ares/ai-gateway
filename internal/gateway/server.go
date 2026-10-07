@@ -16,10 +16,87 @@ type Server struct {
 }
 
 func NewServer(address, gatewayAPIKey string, requestRouter router.Router) *Server {
+	return NewServerWithAuthenticator(address, NewStaticAuthenticator(gatewayAPIKey), requestRouter)
+}
+
+// APIKeyAuthenticator validates a gateway client key. Implementations may use
+// a static environment value, PostgreSQL, or both during migration.
+type APIKeyAuthenticator interface {
+	Validate(context.Context, string) (bool, error)
+}
+
+type gatewayUserLookup interface {
+	GatewayUserID(context.Context, string) (int64, bool, error)
+}
+
+type staticAuthenticator struct {
+	expected string
+}
+
+func NewStaticAuthenticator(expected string) APIKeyAuthenticator {
+	return staticAuthenticator{expected: expected}
+}
+
+func (a staticAuthenticator) Validate(_ context.Context, provided string) (bool, error) {
+	if a.expected == "" || len(provided) != len(a.expected) {
+		return false, nil
+	}
+	return subtle.ConstantTimeCompare([]byte(provided), []byte(a.expected)) == 1, nil
+}
+
+// CompositeAuthenticator keeps the existing environment key working while
+// database-backed gateway keys are being introduced.
+type CompositeAuthenticator struct {
+	static APIKeyAuthenticator
+	db     APIKeyAuthenticator
+}
+
+func NewCompositeAuthenticator(static, db APIKeyAuthenticator) APIKeyAuthenticator {
+	return CompositeAuthenticator{static: static, db: db}
+}
+
+func (a CompositeAuthenticator) Validate(ctx context.Context, provided string) (bool, error) {
+	if a.static != nil {
+		valid, err := a.static.Validate(ctx, provided)
+		if err != nil || valid {
+			return valid, err
+		}
+	}
+	if a.db == nil {
+		return false, nil
+	}
+	return a.db.Validate(ctx, provided)
+}
+
+func (a CompositeAuthenticator) GatewayUserID(ctx context.Context, provided string) (int64, bool, error) {
+	if a.static != nil {
+		valid, err := a.static.Validate(ctx, provided)
+		if err != nil || valid {
+			return 0, false, err
+		}
+	}
+	lookup, ok := a.db.(gatewayUserLookup)
+	if !ok {
+		return 0, false, nil
+	}
+	return lookup.GatewayUserID(ctx, provided)
+}
+
+func NewServerWithAuthenticator(address string, authenticator APIKeyAuthenticator, requestRouter router.Router) *Server {
+	return NewServerWithAdmin(address, authenticator, requestRouter, nil)
+}
+
+// NewServerWithAdmin mounts an optional administrator UI/API below /admin/.
+// The admin handler owns its own authentication and is kept separate from
+// client gateway-key authentication.
+func NewServerWithAdmin(address string, authenticator APIKeyAuthenticator, requestRouter router.Router, adminHandler http.Handler) *Server {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /healthz", healthHandler)
-	mux.Handle("POST /v1/messages", authenticate(gatewayAPIKey, http.HandlerFunc(anthropicMessagesHandler(requestRouter))))
-	mux.Handle("POST /v1/messages/count_tokens", authenticate(gatewayAPIKey, http.HandlerFunc(anthropicMessagesHandler(requestRouter))))
+	mux.Handle("POST /v1/messages", authenticate(authenticator, http.HandlerFunc(anthropicMessagesHandler(requestRouter))))
+	mux.Handle("POST /v1/messages/count_tokens", authenticate(authenticator, http.HandlerFunc(anthropicMessagesHandler(requestRouter))))
+	if adminHandler != nil {
+		mux.Handle("/admin/", adminHandler)
+	}
 
 	return &Server{http: &http.Server{
 		Addr:              address,
@@ -38,7 +115,7 @@ func healthHandler(w http.ResponseWriter, _ *http.Request) {
 	_, _ = w.Write([]byte(`{"status":"ok"}`))
 }
 
-func authenticate(expected string, next http.Handler) http.Handler {
+func authenticate(authenticator APIKeyAuthenticator, next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		provided := r.Header.Get("x-api-key")
 		if provided == "" {
@@ -47,9 +124,24 @@ func authenticate(expected string, next http.Handler) http.Handler {
 				provided = strings.TrimSpace(token)
 			}
 		}
-		if expected == "" || len(provided) != len(expected) || subtle.ConstantTimeCompare([]byte(provided), []byte(expected)) != 1 {
+		valid, err := authenticator.Validate(r.Context(), provided)
+		if err != nil {
+			writeAnthropicError(w, http.StatusServiceUnavailable, "api_error", "gateway authentication backend is unavailable")
+			return
+		}
+		if !valid {
 			writeAnthropicError(w, http.StatusUnauthorized, "authentication_error", "invalid or missing gateway API key")
 			return
+		}
+		if lookup, ok := authenticator.(gatewayUserLookup); ok {
+			userID, found, lookupErr := lookup.GatewayUserID(r.Context(), provided)
+			if lookupErr != nil {
+				writeAnthropicError(w, http.StatusServiceUnavailable, "api_error", "gateway user lookup is unavailable")
+				return
+			}
+			if found {
+				r = r.WithContext(router.WithRequestUserID(r.Context(), userID))
+			}
 		}
 		next.ServeHTTP(w, r)
 	})

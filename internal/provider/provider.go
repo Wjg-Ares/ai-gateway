@@ -10,9 +10,9 @@ const (
 	ProtocolGemini    Protocol = "gemini"
 )
 
-// Config describes an upstream provider. APIKeyEnv names the environment
-// variable that will supply the credential; the credential itself is never
-// stored in this configuration type or example file.
+// Config describes an upstream provider. APIKeyEnv names the fallback
+// environment variable for static credentials; database-managed API/OAuth
+// credentials can override it per authenticated gateway user.
 type Config struct {
 	Protocol  Protocol `json:"protocol"`
 	BaseURL   string   `json:"base_url"`
@@ -20,7 +20,10 @@ type Config struct {
 }
 
 type Credential struct {
-	APIKey string
+	APIKey         string
+	AuthType       string
+	KeyID          int64
+	MaxConcurrency int
 }
 
 func (c Config) ResolveCredential(lookupEnv func(string) (string, bool)) (Credential, error) {
@@ -31,5 +34,5 @@ func (c Config) ResolveCredential(lookupEnv func(string) (string, bool)) (Creden
 	if !ok || key == "" {
 		return Credential{}, fmt.Errorf("provider API key environment variable %q is not set", c.APIKeyEnv)
 	}
-	return Credential{APIKey: key}, nil
+	return Credential{APIKey: key, AuthType: "api_key"}, nil
 }

@@ -1,6 +1,10 @@
 {
-  "listen_addr": "127.0.0.1:19527",
+  "listen_addr": "0.0.0.0:19527",
   "gateway_api_key_env": "AI_GATEWAY_API_KEY",
+  "admin_api_key_env": "AI_GATEWAY_ADMIN_KEY",
+  "admin_password_env": "AI_GATEWAY_ADMIN_PASSWORD",
+  "database_url_env": "AI_GATEWAY_DATABASE_URL",
+  "database_schema": "ai_gateway",
   "models": {
     "deepseek-team": {
       "provider": "deepseek",
@@ -12,6 +16,21 @@
       "protocol": "anthropic",
       "base_url": "https://api.deepseek.com/anthropic",
       "api_key_env": "DEEPSEEK_API_KEY"
+    },
+    "volcengine-ark": {
+      "protocol": "openai",
+      "base_url": "https://ark.cn-beijing.volces.com/api/v3",
+      "api_key_env": "VOLCENGINE_ARK_API_KEY"
+    },
+    "kimi": {
+      "protocol": "openai",
+      "base_url": "https://api.moonshot.cn/v1",
+      "api_key_env": "KIMI_API_KEY"
+    },
+    "openai-direct": {
+      "protocol": "openai",
+      "base_url": "https://api.openai.com/v1",
+      "api_key_env": "OPENAI_API_KEY"
     }
   }
 }

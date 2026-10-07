@@ -1,6 +1,10 @@
 {
   "listen_addr": "127.0.0.1:19527",
   "gateway_api_key_env": "AI_GATEWAY_API_KEY",
+  "admin_api_key_env": "AI_GATEWAY_ADMIN_KEY",
+  "admin_password_env": "AI_GATEWAY_ADMIN_PASSWORD",
+  "database_url_env": "AI_GATEWAY_DATABASE_URL",
+  "database_schema": "ai_gateway",
   "models": {
     "claude-team": {
       "provider": "anthropic-direct",
@@ -11,8 +15,8 @@
       "upstream_model": "deepseek-flash"
     },
     "volcengine-team": {
-      "provider": "volcengine",
-      "upstream_model": "volcengine-model-name"
+      "provider": "volcengine-ark",
+      "upstream_model": "ep-xxxxxxxxxxxxxxxx"
     },
     "kimi-team": {
       "provider": "kimi",
@@ -20,7 +24,8 @@
     },
     "gpt-team": {
       "provider": "openai-direct",
-      "upstream_model": "openai-model-name"
+      "upstream_model": "openai-model-name",
+      "max_concurrency": 1
     },
     "gemini-team": {
       "provider": "gemini-direct",
@@ -38,14 +43,14 @@
       "base_url": "https://api.deepseek.com/anthropic",
       "api_key_env": "DEEPSEEK_API_KEY"
     },
-    "volcengine": {
-      "protocol": "anthropic",
-      "base_url": "https://example.volcengine-endpoint.invalid/anthropic",
-      "api_key_env": "VOLCENGINE_API_KEY"
+    "volcengine-ark": {
+      "protocol": "openai",
+      "base_url": "https://ark.cn-beijing.volces.com/api/v3",
+      "api_key_env": "VOLCENGINE_ARK_API_KEY"
     },
     "kimi": {
-      "protocol": "anthropic",
-      "base_url": "https://example.kimi-endpoint.invalid/anthropic",
+      "protocol": "openai",
+      "base_url": "https://api.moonshot.cn/v1",
       "api_key_env": "KIMI_API_KEY"
     },
     "openai-direct": {

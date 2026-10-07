@@ -12,6 +12,10 @@ import (
 type Config struct {
 	ListenAddr       string                     `json:"listen_addr"`
 	GatewayAPIKeyEnv string                     `json:"gateway_api_key_env"`
+	AdminAPIKeyEnv   string                     `json:"admin_api_key_env,omitempty"`
+	AdminPasswordEnv string                     `json:"admin_password_env,omitempty"`
+	DatabaseURLEnv   string                     `json:"database_url_env,omitempty"`
+	DatabaseSchema   string                     `json:"database_schema,omitempty"`
 	Models           map[string]ModelRoute      `json:"models"`
 	Providers        map[string]provider.Config `json:"providers"`
 }
@@ -19,6 +23,9 @@ type Config struct {
 type ModelRoute struct {
 	Provider      string `json:"provider"`
 	UpstreamModel string `json:"upstream_model"`
+	// MaxConcurrency limits requests using this public model alias. A value of
+	// zero uses the provider default (OpenAI-compatible GPT routes default to 1).
+	MaxConcurrency int `json:"max_concurrency,omitempty"`
 }
 
 func LoadFile(path string) (Config, error) {
@@ -34,6 +41,18 @@ func LoadFile(path string) (Config, error) {
 	}
 	if cfg.ListenAddr == "" {
 		cfg.ListenAddr = "127.0.0.1:19527"
+	}
+	if cfg.DatabaseURLEnv == "" {
+		cfg.DatabaseURLEnv = "AI_GATEWAY_DATABASE_URL"
+	}
+	if cfg.AdminAPIKeyEnv == "" {
+		cfg.AdminAPIKeyEnv = "AI_GATEWAY_ADMIN_KEY"
+	}
+	if cfg.AdminPasswordEnv == "" {
+		cfg.AdminPasswordEnv = "AI_GATEWAY_ADMIN_PASSWORD"
+	}
+	if cfg.DatabaseSchema == "" {
+		cfg.DatabaseSchema = "ai_gateway"
 	}
 	return cfg, nil
 }

@@ -7,14 +7,18 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/Wjg-Ares/ai-gateway/internal/adapter"
 	"github.com/Wjg-Ares/ai-gateway/internal/provider"
 )
 
 type Adapter struct{}
 
-var client = &http.Client{CheckRedirect: func(_ *http.Request, _ []*http.Request) error {
-	return http.ErrUseLastResponse
-}}
+var client = &http.Client{
+	Timeout: adapter.UpstreamTimeout(),
+	CheckRedirect: func(_ *http.Request, _ []*http.Request) error {
+		return http.ErrUseLastResponse
+	},
+}
 
 func (Adapter) Protocol() provider.Protocol { return provider.ProtocolAnthropic }
 
